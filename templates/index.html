@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reminders</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 1.8rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 1.5rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .reminder {
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            transition: transform 0.2s, box-shadow 0.2s, background 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .reminder {
+            cursor: pointer;
+        }
+
+        .reminder:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .reminder.confirmed {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+        }
+
+        .reminder.pending {
+            background: linear-gradient(135deg, #636e72, #4a5568);
+        }
+
+        .reminder.due {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); }
+            50% { box-shadow: 0 4px 25px rgba(231, 76, 60, 0.5); }
+        }
+
+        .reminder .icon {
+            font-size: 2.5rem;
+            opacity: 0.9;
+        }
+
+        .reminder .text {
+            font-size: 1.1rem;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .reminder .time {
+            font-size: 0.85rem;
+            opacity: 0.8;
+        }
+
+        .reminder .status-badge {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .reminder.confirmed .status-badge::before {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            margin-right: 0.4em;
+        }
+
+        .reminder .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .reminder .actions button {
+            border: none;
+            border-radius: 8px;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            color: #fff;
+        }
+
+        .reminder .actions button:hover {
+            opacity: 0.85;
+        }
+
+        .btn-confirm {
+            background: rgba(46, 204, 113, 0.8);
+        }
+
+        .btn-snooze {
+            background: rgba(243, 156, 18, 0.8);
+        }
+
+        .btn-snooze.clicked {
+            background: rgba(243, 156, 18, 0.4);
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .snoozed-info {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h1>Daily Reminders</h1>
+    <div class="grid" id="reminders-grid">
+        {% for r in reminders %}
+        <div class="reminder {{ r.status }}" data-id="{{ r.id }}" onclick="toggleReminder('{{ r.id }}', '{{ r.status }}')">
+            <div class="icon"><i class="fa-solid {{ r.icon }}"></i></div>
+            <div class="text">{{ r.text }}</div>
+            <div class="time">{{ r.time }}</div>
+            {% if r.snoozed_until %}
+            <div class="snoozed-info">Snoozed until {{ r.snoozed_until }}</div>
+            {% endif %}
+            <div class="status-badge">{{ r.status }}</div>
+            {% if r.status != 'confirmed' %}
+            <div class="actions">
+                <button class="btn-snooze" onclick="event.stopPropagation(); snoozeReminder('{{ r.id }}', this)"><i class="fa-solid fa-clock"></i> Snooze</button>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        async function toggleReminder(id, status) {
+            if (status === 'confirmed') {
+                if (!confirm('Are you sure you want to undo this confirmation?')) {
+                    return;
+                }
+                try {
+                    const res = await fetch(`/api/reminders/${id}/unconfirm`, { method: 'POST' });
+                    if (res.ok) refreshReminders();
+                } catch (err) {
+                    console.error('Failed to unconfirm reminder:', err);
+                }
+            } else {
+                try {
+                    const res = await fetch(`/api/reminders/${id}/confirm`, { method: 'POST' });
+                    if (res.ok) refreshReminders();
+                } catch (err) {
+                    console.error('Failed to confirm reminder:', err);
+                }
+            }
+        }
+
+        async function snoozeReminder(id, btn) {
+            btn.classList.add('clicked');
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Snoozed';
+            try {
+                const res = await fetch(`/api/reminders/${id}/snooze`, { method: 'POST' });
+                setTimeout(() => { refreshReminders(); }, 2000);
+            } catch (err) {
+                console.error('Failed to snooze reminder:', err);
+                btn.classList.remove('clicked');
+                btn.innerHTML = '<i class="fa-solid fa-clock"></i> Snooze';
+            }
+        }
+
+        function renderReminder(r) {
+            const snoozedInfo = r.snoozed_until
+                ? `<div class="snoozed-info">Snoozed until ${r.snoozed_until}</div>`
+                : '';
+            const actions = r.status !== 'confirmed'
+                ? `<div class="actions">
+                       <button class="btn-snooze" onclick="event.stopPropagation(); snoozeReminder('${r.id}', this)"><i class="fa-solid fa-clock"></i> Snooze</button>
+                   </div>`
+                : '';
+            return `
+                <div class="reminder ${r.status}" data-id="${r.id}" onclick="toggleReminder('${r.id}', '${r.status}')">
+                    <div class="icon"><i class="fa-solid ${r.icon}"></i></div>
+                    <div class="text">${r.text}</div>
+                    <div class="time">${r.time}</div>
+                    ${snoozedInfo}
+                    <div class="status-badge">${r.status}</div>
+                    ${actions}
+                </div>`;
+        }
+
+        async function refreshReminders() {
+            try {
+                const res = await fetch('/api/reminders');
+                const reminders = await res.json();
+                const grid = document.getElementById('reminders-grid');
+                grid.innerHTML = reminders.map(renderReminder).join('');
+            } catch (err) {
+                console.error('Failed to refresh reminders:', err);
+            }
+        }
+
+        // Auto-refresh every 10 minutes
+        setInterval(refreshReminders, 10 * 60 * 1000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+reminders:
+  - id: 1
+    text: "Zombia (Morning)"
+    time: "06:00"
+    icon: "fa-pills"
+  - id: 2
+    text: "Zombia (Lunch)"
+    time: "15:00"
+    icon: "fa-pills"
+  - id: 3
+    text: "Zombia (Dinner)"
+    time: "21:00"
+    icon: "fa-pills"    
