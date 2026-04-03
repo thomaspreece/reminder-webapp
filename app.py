@@ -143,8 +143,9 @@ def snooze_reminder(reminder_id):
     if reminder_id not in valid_ids:
         return None
     state = load_state()
-    now = datetime.now()
-    snoozed_until = (now + timedelta(hours=2)).strftime("%H:%M")
+    reminder = next(r for r in config["reminders"] if str(r["id"]) == reminder_id)
+    effective_due = get_effective_due_time(reminder, state)
+    snoozed_until = (effective_due + timedelta(hours=1)).strftime("%H:%M")
     state.setdefault("snoozed", {})[reminder_id] = snoozed_until
     save_state(state)
     for r in config["reminders"]:
@@ -165,8 +166,8 @@ def snooze_all_due_reminders():
     snoozed = []
     for r in reminders:
         if r["status"] == "due":
-            snooze_reminder(r["id"])
-            snoozed.append(r["text"])
+            result = snooze_reminder(r["id"])
+            snoozed.append((r["text"], result["snoozed_until"]))
     return snoozed
 
 
@@ -232,20 +233,20 @@ def check_signal_messages():
         if "confirm" in body:
             confirmed = confirm_all_due_reminders()
             if confirmed:
-                reply = "Acknowledged. Confirmed:\n" + "\n".join(
+                reply = "Confirmed:\n" + "\n".join(
                     f"- {t}" for t in confirmed
                 )
             else:
-                reply = "Acknowledged. No due reminders to confirm."
+                reply = "No due reminders to confirm."
             send_signal_message(reply)
         elif "snooze" in body:
             snoozed = snooze_all_due_reminders()
             if snoozed:
-                reply = "Acknowledged. Snoozed for 2 hours:\n" + "\n".join(
-                    f"- {t}" for t in snoozed
+                reply = "Snoozed:\n" + "\n".join(
+                    f"- {text} (due {time})" for text, time in snoozed
                 )
             else:
-                reply = "Acknowledged. No due reminders to snooze."
+                reply = "No due reminders to snooze."
             send_signal_message(reply)
 
 
