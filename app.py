@@ -314,7 +314,7 @@ def api_snooze_reminder(reminder_id):
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(reset_reminders, "cron", hour=0, minute=0, id="midnight_reset")
-scheduler.add_job(check_due_reminders, "cron", hour="*", id="hourly_check")
+scheduler.add_job(check_due_reminders, "cron", hour="*", minute="10,40", id="hourly_check")
 scheduler.add_job(check_signal_messages, "interval", minutes=1, id="signal_check")
 
 if __name__ == "__main__":
